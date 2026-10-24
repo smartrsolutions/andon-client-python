@@ -1,0 +1,732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andon.app/spec/view-v1.schema.json",
+  "title": "Andon view",
+  "description": "One document per view: tile definitions and their data (schema version 1). Strict for producers and the configurator; the app itself reads tolerantly.",
+  "type": "object",
+  "required": [
+    "id",
+    "schemaVersion",
+    "name",
+    "generatedAt",
+    "staleAfterSec",
+    "tiles"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional, for editor support only; the app ignores this field."
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The view's GUID; generated once, immutable afterwards."
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "generatedAt": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "staleAfterSec": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Once generatedAt is older than this, every tile counts as stale."
+    },
+    "tiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/tile"
+      },
+      "description": "Tiles in display order."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "ISO 8601 in UTC, for example 2026-09-22T18:30:05Z."
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "warning",
+        "critical",
+        "stale"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^(none|[a-z0-9]+(\\.[a-z0-9]+)*)$",
+      "description": "An SF Symbols name, or \"none\". Whether the symbol exists is checked by the app alone."
+    },
+    "range": {
+      "type": "object",
+      "required": [
+        "min",
+        "max"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "required": [
+        "to",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "type": "number"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    },
+    "numberList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "seriesSamples": {
+      "type": "object",
+      "required": [
+        "name",
+        "samples"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/timestamp"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "minItems": 2,
+            "items": false
+          }
+        }
+      }
+    },
+    "seriesSteps": {
+      "type": "object",
+      "required": [
+        "name",
+        "start",
+        "stepSec",
+        "points"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "stepSec": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "points": {
+          "$ref": "#/$defs/numberList"
+        }
+      }
+    },
+    "seriesValues": {
+      "type": "object",
+      "required": [
+        "name",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "$ref": "#/$defs/numberList"
+        },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": "A verdict per value, parallel to values; null is neutral. Only on a bar with categories and exactly one series. Its length is not checked: the app treats missing entries as null and ignores surplus ones."
+        }
+      }
+    },
+    "timeSeries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/seriesSamples"
+          },
+          {
+            "$ref": "#/$defs/seriesSteps"
+          }
+        ]
+      }
+    },
+    "categorySeries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/seriesValues"
+      }
+    },
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tile": {
+      "type": "object",
+      "required": [
+        "id",
+        "view",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,64}$",
+          "description": "Stable tile ID, unique within the document."
+        },
+        "view": {
+          "enum": [
+            "label",
+            "gauge",
+            "progress",
+            "line",
+            "bar",
+            "pie",
+            "donut",
+            "table",
+            "timeline"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "titleShort": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12,
+          "description": "For small widgets and for the Watch."
+        },
+        "icon": {
+          "$ref": "#/$defs/symbol",
+          "description": "Symbol in the tile header; when absent, the default for this view kind."
+        },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "When absent, the tile is neutral."
+        },
+        "subtext": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Ready-made text; times of day rather than durations."
+        },
+        "value": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "valueIcon": {
+          "$ref": "#/$defs/symbol"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "range": {
+          "$ref": "#/$defs/range"
+        },
+        "target": {
+          "type": "number"
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/band"
+          }
+        },
+        "categories": {
+          "$ref": "#/$defs/categories"
+        },
+        "series": {
+          "type": "array"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "description": "Column headers; every row must carry the same number of cells."
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/row"
+          },
+          "description": "Rows in display order."
+        },
+        "from": {
+          "$ref": "#/$defs/timestamp",
+          "description": "Start of the time axis (timeline)."
+        },
+        "to": {
+          "$ref": "#/$defs/timestamp",
+          "description": "End of the time axis (timeline); may lie in the future."
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/timelineState"
+          }
+        },
+        "lanes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/timelineLane"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "label"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value"
+            ],
+            "properties": {
+              "range": false,
+              "target": false,
+              "bands": false,
+              "categories": false,
+              "series": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "enum": [
+                  "gauge",
+                  "progress"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value",
+              "range"
+            ],
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "valueIcon": false,
+              "categories": false,
+              "series": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "line"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "series"
+            ],
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "series": {
+                "$ref": "#/$defs/timeSeries"
+              },
+              "valueIcon": false,
+              "bands": false,
+              "categories": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "bar"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "series"
+            ],
+            "properties": {
+              "value": false,
+              "valueIcon": false,
+              "range": false,
+              "bands": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "bar"
+              }
+            },
+            "required": [
+              "categories"
+            ]
+          },
+          "then": {
+            "properties": {
+              "series": {
+                "$ref": "#/$defs/categorySeries",
+                "if": {
+                  "minItems": 2
+                },
+                "then": {
+                  "items": {
+                    "properties": {
+                      "statuses": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "bar"
+              }
+            },
+            "not": {
+              "required": [
+                "categories"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "series": {
+                "$ref": "#/$defs/timeSeries"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "enum": [
+                  "pie",
+                  "donut"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "categories",
+              "series"
+            ],
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "series": {
+                "$ref": "#/$defs/categorySeries",
+                "type": "array",
+                "maxItems": 1,
+                "items": {
+                  "properties": {
+                    "statuses": false
+                  }
+                }
+              },
+              "valueIcon": false,
+              "range": false,
+              "target": false,
+              "bands": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "pie"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "table"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "columns",
+              "rows"
+            ],
+            "properties": {
+              "value": false,
+              "valueIcon": false,
+              "unit": false,
+              "decimals": false,
+              "range": false,
+              "target": false,
+              "bands": false,
+              "categories": false,
+              "series": false
+            }
+          },
+          "else": {
+            "properties": {
+              "columns": false,
+              "rows": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "view": {
+                "const": "timeline"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "from",
+              "to",
+              "states",
+              "lanes"
+            ],
+            "properties": {
+              "value": false,
+              "valueIcon": false,
+              "unit": false,
+              "decimals": false,
+              "range": false,
+              "target": false,
+              "bands": false,
+              "categories": false,
+              "series": false
+            }
+          },
+          "else": {
+            "properties": {
+              "from": false,
+              "to": false,
+              "states": false,
+              "lanes": false
+            }
+          }
+        }
+      ]
+    },
+    "cell": {
+      "type": [
+        "string",
+        "number",
+        "null"
+      ],
+      "description": "Text, number, or null for an empty cell."
+    },
+    "column": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "required": [
+        "cells"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/cell"
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    },
+    "timelineState": {
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,32}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "status": {
+          "$ref": "#/$defs/status",
+          "description": "When absent, the colour comes from the app's category palette."
+        }
+      }
+    },
+    "timelineLane": {
+      "type": "object",
+      "required": [
+        "name",
+        "segments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/timestamp"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ],
+            "minItems": 2,
+            "items": false
+          },
+          "description": "[start, state-id], ascending. A segment lasts until the next start, the last one until min(to, generatedAt)."
+        }
+      }
+    }
+  }
+}
